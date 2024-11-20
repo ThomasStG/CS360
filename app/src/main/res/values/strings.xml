@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">SNAR</string>
+    <string name="building_display">Building Name: %1$s (%2$.2f m) \n %3$s</string>
+</resources>
