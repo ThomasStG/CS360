@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">SNAR</string>
+    <string name="building_display_description">Building Name: %1$s (%2$.2f m)</string>
+    <string name="google_ar_api_key">855721974734-u8nj78jckbktgngreo91ktlm9jddttp2.apps.googleusercontent.com</string>
+    <string name="building_display_name">%1$s</string>
+    <string name="building_display">Building Name: %1$s (%2$.2f m) \n %3$s</string>
+
+</resources>
