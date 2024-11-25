@@ -1,18 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- Camera Preview -->
-    <androidx.camera.view.PreviewView
-        android:id="@+id/previewView"
+    <SurfaceView
+        android:id="@+id/surface_view"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <!-- AR Overlay -->
+    <androidx.camera.view.PreviewView
+        android:id="@+id/surfaceView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
     <com.google.ar.sceneform.ArSceneView
         android:id="@+id/arSceneView"
         android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <FrameLayout
+        android:id="@+id/overlayFrame"
+        android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:visibility="gone" />
+        android:layout_alignParentTop="true"
+        android:layout_centerHorizontal="true"
+        android:background="@android:color/transparent"
+        android:padding="8dp"
+        android:text="ghj"
+        android:textColor="@android:color/white" />
 </FrameLayout>
