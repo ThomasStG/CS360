@@ -5,12 +5,11 @@ plugins {
 
 android {
     namespace = "com.example.snar"
-    compileSdk = 34
-
+    compileSdk = 35
     defaultConfig {
         applicationId = "com.example.snar"
-        minSdk = 24
-        targetSdk = 34
+        minSdk = 30
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
 
@@ -63,6 +62,7 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
     implementation(libs.core)
+    implementation(libs.play.services.maps)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -76,5 +76,20 @@ dependencies {
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
     implementation(libs.androidx.camera.extensions)
+   // implementation(libs.arsceneview)
+    implementation(libs.play.services.location)
+    //implementation(libs.play.services.auth)
+    //implementation(libs.sceneview.ar)
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.1")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.1")
+    implementation("androidx.appcompat:appcompat:1.6.1")
+    implementation("com.google.code.gson:gson:2.10.1")
+    implementation("com.google.android.gms:play-services-auth:16.+")
+
 
 }
+
+
+
+
