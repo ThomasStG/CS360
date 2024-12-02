@@ -48,6 +48,23 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.concurrent.Executors
 
+//new imports 12/2/2024
+import com.google.ar.core.*
+import com.google.ar.sceneform.AnchorNode
+import com.google.ar.sceneform.FrameTime
+import com.google.ar.sceneform.Scene
+import com.google.ar.sceneform.rendering.ViewRenderable
+import com.google.gson.Gson
+import java.io.InputStreamReader
+
+//new code 12/2/2024
+data class Building(
+    val latitude: Double,
+    val longitude: Double,
+    val name: String,
+    val description: String
+)
+
 
 class MainActivity : ComponentActivity() {
     companion object {
@@ -69,6 +86,160 @@ class MainActivity : ComponentActivity() {
     var jsonContent: List<Building>? = null
 
     //lateinit var view: HelloGeoView
+
+private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (!isGranted) Toast.makeText(this, "Camera permission denied.", Toast.LENGTH_SHORT).show()
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        arSceneView = findViewById(R.id.arSceneView)
+        overlayFrame = findViewById(R.id.overlayFrame)
+
+        if (!ensureCameraAndArCoreSupport()) return
+
+        jsonContent = loadBuildingData(this)
+
+        initializeARSession()
+
+        arSceneView.scene.addOnUpdateListener(object : Scene.OnUpdateListener {
+            override fun onUpdate(frameTime: FrameTime) {
+                val session = arSceneView.session
+                if (session != null) {
+                    arSceneView.scene.removeOnUpdateListener(this)
+                    jsonContent?.let { addAnchorsForBuildings(it) }
+                }
+            }
+        })
+    }
+
+    private fun initializeARSession() {
+        try {
+            val session = Session(this)
+            val config = Config(session)
+            config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
+            session.configure(config)
+            arSceneView.setupSession(session)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error initializing ARCore session: ${e.localizedMessage}", e)
+            Toast.makeText(this, "Failed to initialize ARCore session.", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun loadBuildingData(context: Context): List<Building> {
+        val inputStream = context.assets.open("building_info.json")
+        val reader = InputStreamReader(inputStream)
+        val gson = Gson()
+
+        val buildings = gson.fromJson(reader, Array<Building>::class.java).toList()
+        reader.close()
+        return buildings
+    }
+
+    private fun ensureCameraAndArCoreSupport(): Boolean {
+        if (!isCameraSupported(this)) {
+            Toast.makeText(this, "Camera permissions not enabled.", Toast.LENGTH_LONG).show()
+            return false
+        }
+        return true
+    }
+
+    private fun isCameraSupported(context: Context): Boolean {
+        return when {
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED -> true
+            ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.CAMERA) -> {
+                showInContextUI(context)
+                false
+            }
+            else -> {
+                requestPermissionLauncher.launch(Manifest.permission.CAMERA)
+                false
+            }
+        }
+    }
+
+    private fun showInContextUI(context: Context) {
+        // Add rationale for requesting camera permissions
+    }
+
+    override fun onResume() {
+        super.onResume()
+        arSceneView.resume()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        arSceneView.pause()
+    }
+
+    private fun addAnchorsForBuildings(buildings: List<Building>) {
+        val frame = arSceneView.arFrame ?: return
+
+        // Ensure planes are available and being tracked
+        val planes = arSceneView.session?.getAllTrackables(Plane::class.java)
+        if (planes.isNullOrEmpty() || planes.none { it.trackingState == TrackingState.TRACKING }) {
+            Log.e(TAG, "No tracking planes available.")
+            return
+        }
+
+        buildings.forEach { building ->
+            val screenX = (arSceneView.width / 2f)
+            val screenY = (arSceneView.height / 2f)
+
+            val hitResults = frame.hitTest(screenX, screenY)
+            if (hitResults.isNotEmpty()) {
+                val hitResult = hitResults[0]
+                val anchor = hitResult.createAnchor()
+
+                val anchorNode = AnchorNode(anchor).apply {
+                    setParent(arSceneView.scene)
+                }
+
+                ViewRenderable.builder()
+                    .setView(this, createBuildingSignView(building))
+                    .build()
+                    .thenAccept { renderable ->
+                        anchorNode.renderable = renderable
+                    }
+                    .exceptionally {
+                        Log.e(TAG, "Error creating renderable: ${it.localizedMessage}", it)
+                        null
+                    }
+            } else {
+                Log.e(TAG, "No hit result for building: ${building.name}")
+            }
+        }
+    }
+
+    private fun createBuildingSignView(building: Building): TextView {
+        return TextView(this).apply {
+            text = "${building.name}\n${building.description}"
+            textSize = 16f
+            setBackgroundColor(ContextCompat.getColor(this@MainActivity, android.R.color.holo_blue_light))
+        }
+    }
+
+    companion object {
+        private const val TAG = "ARActivity"
+        private const val METERS_PER_DEGREE_LATITUDE = 111320.0 // Approximation
+        private const val METERS_PER_DEGREE_LONGITUDE = 111320.0 // Varies based on latitude
+    }
+
+    data class Location(val latitude: Double, val longitude: Double, val altitude: Double)
+    data class Translation(val x: Float, val y: Float, val z: Float)
+
+}
+
+    
+/* 12/2/2024
+
+
+
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -491,5 +662,5 @@ class MainActivity : ComponentActivity() {
     }
 
 
+*/
 
-}
