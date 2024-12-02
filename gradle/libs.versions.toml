@@ -18,6 +18,8 @@ playServicesAuth = "21.2.0" # min 16
 playServicesLocation = "21.3.0"
 sceneviewAr = "1.5.2"
 playServicesMaps = "19.0.0"
+sceneformUx = "1.17.1"
+activityKtx = "1.9.3"
 
 [libraries]
 androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
@@ -47,6 +49,8 @@ play-services-auth = { module = "com.google.android.gms:play-services-auth", ver
 play-services-location = { module = "com.google.android.gms:play-services-location", version.ref = "playServicesLocation" }
 sceneview-ar = { module = "io.github.sceneview:sceneview-ar", version.ref = "sceneviewAr" }
 play-services-maps = { group = "com.google.android.gms", name = "play-services-maps", version.ref = "playServicesMaps" }
+sceneform-ux = { group = "com.google.ar.sceneform.ux", name = "sceneform-ux", version.ref = "sceneformUx" }
+androidx-activity-ktx = { group = "androidx.activity", name = "activity-ktx", version.ref = "activityKtx" }
 
 
 [plugins]

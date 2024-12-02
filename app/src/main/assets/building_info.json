@@ -1,2 +1,2 @@
-[{"Lat": 43.04065880785853,"Long": -71.45348373392801,"Name": "Test Building", "Description": "This is a sample pin for testing. it is located at the green center"},
-  {"Lat": 43.03982659796824, "Long": -71.4539532578147, "Name": "Snhudent Snhenter", "Description":  "Wellness"}]
+[{"name": "Test Building", "latitude": 43.08544624774401,"longitude": -71.52163549246485, "altitude":  50,"description": "This is a sample pin for testing. it is located at my house"},
+  {"name": "Snhudent Snhenter","latitude": 43.03982659796824, "longitude": -71.4539532578147,  "altitude":  50, "description":  "Wellness"}]
