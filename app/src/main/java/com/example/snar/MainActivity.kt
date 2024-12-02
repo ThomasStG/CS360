@@ -3,6 +3,7 @@ package com.example.snar
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.content.res.Resources
 import android.graphics.PixelFormat
 import android.graphics.SurfaceTexture
 import android.hardware.camera2.CameraCaptureSession
@@ -21,10 +22,7 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.view.PreviewView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
@@ -46,30 +44,23 @@ import com.google.ar.sceneform.ArSceneView
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.util.concurrent.Executors
-
 
 class MainActivity : ComponentActivity() {
     companion object {
         private const val TAG = "ARActivity"
     }
-    private lateinit var binding: ActivityMainBinding
     private lateinit var previewView: SurfaceView
     private lateinit var arSceneView: ArSceneView
     private lateinit var overlayFrame: FrameLayout
-    //private lateinit var arCoreSession: Session
     private lateinit var cameraManager: CameraManager
     private var cameraDevice: CameraDevice? = null
     private var captureSession: CameraCaptureSession? = null
-    private lateinit var surfaceTexture: SurfaceTexture
     private lateinit var surface: Surface
 
     private lateinit var surfaceView: SurfaceView
     lateinit var arCoreSessionHelper: ARCoreSessionLifecycleHelper
     var jsonContent: List<Building>? = null
-
-    //lateinit var view: HelloGeoView
-
+    
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -82,7 +73,7 @@ class MainActivity : ComponentActivity() {
 
         // Ensure Camera and ARCore support
         if (!ensureCameraAndArCoreSupport()) return
-       // startCamera()
+        // startCamera()
         // Check and request permissions using GeoPermissionsHelper
         if (!GeoPermissionsHelper.hasGeoPermissions(this)) {
             GeoPermissionsHelper.requestPermissions(this)
@@ -117,10 +108,17 @@ class MainActivity : ComponentActivity() {
 
             startFrameUpdateLoop()
             jsonContent = loadBuildingData(this) // Load building data
-        } catch (e: Exception) {
-            Log.e(TAG, "Error initializing ARCore session: ${e.localizedMessage}", e)
-            Toast.makeText(this, "Failed to initialize ARCore session.", Toast.LENGTH_LONG).show()
-        }
+        } catch (e: UnavailableDeviceNotCompatibleException) {
+        Log.e(TAG, "Device not compatible", e)
+    } catch (e: UnavailableApkTooOldException) {
+        Log.e(TAG, "ARCore APK too old", e)
+    } catch (e: UnavailableSdkTooOldException) {
+        Log.e(TAG, "SDK too old", e)
+    } catch (e: CameraNotAvailableException) {
+        Log.e(TAG, "Camera not available", e)
+    } catch (e: Exception) {
+        Log.e(TAG, "General exception: ${e.localizedMessage}", e)
+    }
     }
 
     private fun handleArCoreException(exception: Exception) {
@@ -185,31 +183,7 @@ class MainActivity : ComponentActivity() {
             }
         )
     }
-    /*
-    //@Deprecated("This method has been deprecated in favor of using the Activity Result API\n      which brings increased type safety via an {@link ActivityResultContract} and the prebuilt\n      contracts for common intents available in\n      {@link androidx.activity.result.contract.ActivityResultContracts}, provides hooks for\n      testing, and allow receiving results in separate, testable classes independent from your\n      activity. Use\n      {@link #registerForActivityResult(ActivityResultContract, ActivityResultCallback)} passing\n      in a {@link RequestMultiplePermissions} object for the {@link ActivityResultContract} and\n      handling the result in the {@link ActivityResultCallback#onActivityResult(Object) callback}.")
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<String>,
-        results: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, results)
-        if (!GeoPermissionsHelper.hasGeoPermissions(this)) {
-            // Use toast instead of snackbar here since the activity will exit.
-            Toast.makeText(this, "Camera and location permissions are needed to run this application", Toast.LENGTH_LONG)
-                .show()
-            if (!GeoPermissionsHelper.shouldShowRequestPermissionRationale(this)) {
-                // Permission denied with checking "Do not ask again".
-                GeoPermissionsHelper.launchPermissionSettings(this)
-            }
-            finish()
-        }
-    }*/
-
-    //override fun onWindowFocusChanged(hasFocus: Boolean) {
-     //   super.onWindowFocusChanged(hasFocus)
-        //FullScreenHelper.setFullScreenOnWindowFocusChanged(this, hasFocus)
-    //}
-
+    
     private fun startFrameUpdateLoop() {
         val exceptionHandler = CoroutineExceptionHandler { _, throwable ->
             Log.e("ARCore", "Unhandled coroutine exception", throwable)
@@ -225,44 +199,30 @@ class MainActivity : ComponentActivity() {
 
     }
 
-    /*
-    private fun startFrameUpdateLoop() {
-        lifecycleScope.launch(CoroutineExceptionHandler { _, throwable ->
-            Log.e(TAG, "Unhandled coroutine exception", throwable)
-        }) {
-            while (isActive) {
-                arCoreSession?.let { processFrame(it) }
-                delay(100)  // Adjust based on desired frame rate
-            }
-        }
-    }
-*/
     private fun processFrame(session: Session?) {
         try {
+            overlayFrame.removeAllViews()
             if (session == null) return
-            //val session = arCoreSession ?: return // Ensure the session is not null
-            // Perform frame processing
+
             val frame = session.update()
             val camera = frame.camera
-            //if (arCoreSessionHelper.isSessionPaused || camera.trackingState == TrackingState.PAUSED) return
-            Log.d(TAG, "We are in")
+
             if (camera.trackingState == TrackingState.TRACKING) {
-                Log.d(TAG, "Camera Tracking")
                 val earth = session.earth ?: return
 
-                // Map to track TextViews for each building by a unique identifier (e.g., building name or ID)
-                val buildingTextViews = mutableMapOf<String, TextView>()
-
                 if (earth.trackingState == TrackingState.TRACKING) {
-                    Log.d(TAG, "Earth Tracking")
-
                     val cameraGeospatialPose = earth.cameraGeospatialPose
+                    val buildingTextViews = mutableMapOf<String, TextView>()
+                    // Determine which buildings are currently in view
+                    val buildingsInView = mutableSetOf<String>()
+                    if (jsonContent == null){
+                        loadBuildingData(this)
+                    }
                     jsonContent?.forEach { building ->
-                        val buildingLat: Double = building.latitude
-                        val buildingLon: Double = building.longitude
+                        val buildingLat = building.latitude
+                        val buildingLon = building.longitude
                         val buildingAlt = building.altitude
 
-                        // Compute distance to the building
                         val result = floatArrayOf(0f)
                         Location.distanceBetween(
                             cameraGeospatialPose.latitude,
@@ -272,21 +232,21 @@ class MainActivity : ComponentActivity() {
                             result
                         )
                         val distance = result[0]
-                        val pose = cameraGeospatialPose.getEastUpSouthQuaternion()
-                        val p = earth.getPose(43.03982659796824, -71.4539532578147, 50.0, pose.component1(), pose.component2(),pose.component3(),pose.component4())
-                        Log.d(TAG, pose.toString())
-                        // Create an identity matrix (4x4) for the transformation
-                        val transformationMatrix = FloatArray(16)
-                        Matrix.setIdentityM(transformationMatrix, 0)
+                        Log.d("DEBUG1", "Camera Coordinates: lat=${cameraGeospatialPose.latitude}, lon=${cameraGeospatialPose.longitude}")
+                        Log.d("DEBUG1", "Building Coordinates: lat=$buildingLat, lon=$buildingLon")
+                        Log.d("DEBUG1", "Distance: lat=${result[0]}")
 
-                        val buildingAnchor = earth.createAnchor(
+                        val pose = cameraGeospatialPose.getEastUpSouthQuaternion()
+                        val buildingPose = earth.getPose(
                             buildingLat,
                             buildingLon,
                             buildingAlt,
-                            transformationMatrix
+                            pose.component1(),
+                            pose.component2(),
+                            pose.component3(),
+                            pose.component4()
                         )
 
-                        val buildingPose = buildingAnchor.pose // Extract Pose from the anchor
                         val screenPosition = FloatArray(4)
                         val worldPosition = floatArrayOf(
                             buildingPose.tx(),
@@ -294,77 +254,92 @@ class MainActivity : ComponentActivity() {
                             buildingPose.tz(),
                             1f
                         )
+                        val viewMatrix = FloatArray(16)
                         val projectionMatrix = FloatArray(16)
+                        val viewProjectionMatrix = FloatArray(16)
+                        camera.getViewMatrix(viewMatrix, 0)
                         camera.getProjectionMatrix(projectionMatrix, 0, 0.1f, 100.0f)
 
-                        // Multiply the projection matrix by the world position
-                        Matrix.multiplyMV(screenPosition, 0, projectionMatrix, 0, worldPosition, 0)
+                        Matrix.multiplyMM(viewProjectionMatrix, 0, projectionMatrix, 0, viewMatrix, 0)
+                        Matrix.multiplyMV(screenPosition, 0, viewProjectionMatrix, 0, worldPosition, 0)
 
+                        val normalizedX = (screenPosition[0] / screenPosition[3])//.coerceIn(-1f, 1f)
+                        val normalizedY = (screenPosition[1] / screenPosition[3])//.coerceIn(-1f, 1f)
 
-                        val screenX = (screenPosition[0] / screenPosition[3]) * overlayFrame.width
-                        val screenY = (screenPosition[1] / screenPosition[3]) * overlayFrame.height
-                        Log.d("POSITION", "Screen Position: x=${screenPosition[0]}, y=${screenPosition[1]}")
-                        // Dynamically manage TextView for the building
-                        var displayText = getString(
+                        var screenX = ((normalizedX + 1) / 2) * overlayFrame.width
+                        var screenY = ((1 - normalizedY) / 2) * overlayFrame.height
+
+                        // Update or create TextView for the building
+                        val displayText = getString(
                             R.string.building_display,
                             building.name,
                             distance,
                             building.description
                         )
-                        val textView = TextView(this).apply {
-                            text = displayText
-                            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.black))
-                            setBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.white))
-                            textSize = 16f
-                            x = screenX
-                            y = screenY
-                        }
-                        overlayFrame.addView(textView)
-                        buildingTextViews[building.name] = textView
-                        runOnUiThread {
-                            displayText = getString(
-                                R.string.building_display,
-                                building.name,
-                                distance,
-                                building.description
-                            )
+                        Log.d("TEXTSIZE", "size: ${16f - (distance/50)}, name: ${building.name}")
 
-                            if (buildingTextViews.containsKey(building.name)) {
-                                // Update existing TextView
-                                val textView = buildingTextViews[building.name]!!
-                                textView.text = displayText
-                                textView.x = screenX
-                                textView.y = screenY
-                            } else {
-                                // Create a new TextView
-                                val textView = TextView(this).apply {
-                                    text = displayText
-                                    setTextColor(ContextCompat.getColor(this@MainActivity, R.color.black))
-                                    setBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.white))
-                                    textSize = 16f
-                                    x = screenX
-                                    y = screenY
-                                }
+                        if (buildingTextViews.containsKey(building.name)) {
+                            // Update existing TextView
+                            val textView = buildingTextViews[building.name]!!
+                            textView.text = displayText
+                            textView.x = screenX
+                            textView.y = screenY
+                        } else {
+                            // Create new TextView
+                            val textView = TextView(this).apply {
+                                text = displayText
+                                maxWidth =
+                                    (Resources.getSystem().displayMetrics.widthPixels * 0.6).toInt()
+                                layoutParams = FrameLayout.LayoutParams(
+                                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                                    FrameLayout.LayoutParams.WRAP_CONTENT
+                                )
+                                setTextColor(
+                                    ContextCompat.getColor(
+                                        this@MainActivity,
+                                        R.color.teal_700
+                                    )
+                                )
+                                maxHeight =
+                                    (Resources.getSystem().displayMetrics.heightPixels * 0.3).toInt()
+                                setBackgroundColor(
+                                    ContextCompat.getColor(
+                                        this@MainActivity,
+                                        R.color.white
+                                    )
+                                )
+                                //textSize = 16f
+                                x = screenX
+                                y = screenY
+                                z = -distance
+                                textSize = (16f - (distance / 6.25)).toFloat()
+                            }
+                            //if (distance <= 500){
                                 overlayFrame.addView(textView)
                                 buildingTextViews[building.name] = textView
-                            }
-                            Log.d(TAG, "UUUUUGH")
+                            //}
                         }
+
+                        // Mark building as in view
+                        buildingsInView.add(building.name)
+                    }
+
+                    // Remove TextViews for buildings no longer in view
+                    val buildingsToRemove = buildingTextViews.keys - buildingsInView
+                    for (buildingName in buildingsToRemove) {
+                        val textView = buildingTextViews[buildingName]
+                        overlayFrame.removeView(textView)
+                        buildingTextViews.remove(buildingName)
                     }
                 }
-                else Log.d(TAG, "EARTHHHHHH")
-
             }
-
         } catch (e: CameraNotAvailableException) {
             Log.e(TAG, "Camera not available. Restarting camera.", e)
-            //stopCamera() // Stop the camera
-            //startCamera() // Restart the camera
-        }
-        catch (e: Exception) {
+        } catch (e: Exception) {
             Log.e("ARCore", "Error processing frame", e)
         }
     }
+
 
     // Camera permissions and setup (remains as is)
     private val requestPermissionLauncher = registerForActivityResult(
@@ -385,26 +360,6 @@ class MainActivity : ComponentActivity() {
             .show()
     }
 
-    private fun stopCamera() {
-        try {
-            val cameraProvider = ProcessCameraProvider.getInstance(this).get()
-            cameraProvider.unbindAll() // Unbind all use cases to release resources
-            Log.d(TAG, "Released all camera resources.")
-        } catch (e: Exception) {
-            Log.e(TAG, "Error releasing camera resources", e)
-        }
-    }
-
-    private fun releaseCameraResources() {
-        try {
-            val cameraProvider = ProcessCameraProvider.getInstance(this).get()
-            cameraProvider.unbindAll() // Unbind all use cases to release resources
-            Log.d(TAG, "Released all camera resources.")
-        } catch (e: Exception) {
-            Log.e(TAG, "Error releasing camera resources", e)
-        }
-    }
-
 
     private fun isCameraSupported(context: Context): Boolean {
         return when {
@@ -420,76 +375,47 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun openCamera() {
-        try {
-            // Get available camera IDs
-            val cameraId = cameraManager.cameraIdList[0] // Assuming back camera
-            val cameraCharacteristics = cameraManager.getCameraCharacteristics(cameraId)
-
-            // Create a surface from the preview texture
-            surfaceTexture = CreateSurface(previewView.holder.surface) // or use previewView.getSurfaceTexture()
-            surface = Surface(surfaceTexture)
-
-            // Open the camera
-            cameraManager.openCamera(cameraId, object : CameraDevice.StateCallback() {
-                override fun onOpened(camera: CameraDevice) {
-                    cameraDevice = camera
-                    startPreview()
-                }
-
-                override fun onDisconnected(camera: CameraDevice) {
-                    cameraDevice?.close()
-                }
-
-                override fun onError(camera: CameraDevice, error: Int) {
-                    Log.e(TAG, "Camera Error: $error")
-                }
-            }, null)
-        }
-        catch(e: SecurityException){
-            e.printStackTrace()
-        }
-        catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-
     private fun startPreview() {
         try {
-            // Create a CameraCaptureSession to start preview
-            val builder = cameraDevice?.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
-            builder?.addTarget(surface)
+            val captureRequestBuilder = cameraDevice?.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
+            captureRequestBuilder?.addTarget(surface)
 
-            // Create CameraCaptureSession
+            // Create a CameraCaptureSession
             cameraDevice?.createCaptureSession(
-                listOf(surface), object : CameraCaptureSession.StateCallback() {
+                listOf(surface),
+                object : CameraCaptureSession.StateCallback() {
                     override fun onConfigured(session: CameraCaptureSession) {
                         captureSession = session
                         try {
-                            val captureRequest = builder?.build()
+                            val captureRequest = captureRequestBuilder?.build()
                             captureSession?.setRepeatingRequest(captureRequest!!, null, null)
                         } catch (e: Exception) {
-                            e.printStackTrace()
+                            Log.e(TAG, "Failed to start camera preview", e)
                         }
                     }
 
                     override fun onConfigureFailed(session: CameraCaptureSession) {
                         Log.e(TAG, "Failed to configure camera capture session.")
                     }
-                }, null
+                },
+                null
             )
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e(TAG, "Failed to start preview", e)
         }
     }
 
+
     override fun onPause() {
         super.onPause()
-        // Release camera resources when activity is paused
         cameraDevice?.close()
         captureSession?.close()
     }
 
-
-
+    override fun onResume() {
+        super.onResume()
+        if (previewView.holder.surface.isValid) {
+            //
+        }
+    }
 }
