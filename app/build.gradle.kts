@@ -76,7 +76,7 @@ dependencies {
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
     implementation(libs.androidx.camera.extensions)
-   // implementation(libs.arsceneview)
+    // implementation(libs.arsceneview)
     implementation(libs.play.services.location)
     //implementation(libs.play.services.auth)
     //implementation(libs.sceneview.ar)
@@ -86,8 +86,6 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("com.google.code.gson:gson:2.10.1")
     implementation("com.google.android.gms:play-services-auth:16.+")
-
-
 }
 
 
