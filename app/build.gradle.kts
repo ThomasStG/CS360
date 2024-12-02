@@ -9,7 +9,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.snar"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
@@ -76,5 +76,16 @@ dependencies {
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
     implementation(libs.androidx.camera.extensions)
+    implementation ("androidx.multidex:multidex:2.0.1")
+
+    // Sceneform UX library for AR features
+    implementation("com.google.ar.sceneform.ux:sceneform-ux:1.17.1")  // Use the latest version
+
+    // Sceneform Core library for 3D model rendering and related features
+    implementation("com.google.ar.sceneform:sceneform:1.17.1")  // Use the latest version
+    //implementation("com.google.ar.sceneform.ux:sceneform-ux:1.17.1")  // Sceneform UX
+    //implementation("com.google.ar.sceneform:sceneform:1.17.1")  // Sceneform Core
+    //implementation("androidx.appcompat:appcompat:1.3.1")  // Ensure you have appcompat
+    implementation("androidx.constraintlayout:constraintlayout:2.1.0")
 
 }

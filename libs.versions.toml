@@ -1,5 +1,5 @@
 [versions]
-agp = "8.6.1"
+agp = "8.7.2"
 appcompat = "1.7.0"
 ar = "1.4.7"
 arsceneview = "2.2.1"
@@ -15,6 +15,7 @@ lifecycleRuntimeKtx = "2.8.6"
 activityCompose = "1.9.3"
 composeBom = "2024.10.00"
 core = "1.17.1"
+androidGradlePlugin = "8.0.2"
 
 [libraries]
 androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
@@ -40,6 +41,8 @@ androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit
 androidx-material3 = { group = "androidx.compose.material3", name = "material3" }
 core = { group = "com.google.ar.sceneform", name = "core", version.ref = "core" }
 sceneview = { module = "io.github.sceneview:sceneview", version.ref = "arsceneview" }
+retrofit = "com.squareup.retrofit2:retrofit:2.9.0"
+okhttp = "com.squareup.okhttp3:okhttp:4.9.0"
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
