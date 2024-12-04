@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.content.res.Resources
-import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.SurfaceTexture
 import android.hardware.camera2.CameraCaptureSession
@@ -14,21 +13,17 @@ import android.location.Location
 import android.opengl.Matrix
 import android.os.Bundle
 import android.util.Log
-import android.view.LayoutInflater
 import android.view.Surface
 import android.view.SurfaceHolder
 import android.view.SurfaceView
-import android.view.ViewGroup
+import android.view.View.GONE
 import android.widget.FrameLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.view.PreviewView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
@@ -38,6 +33,8 @@ import com.example.snar.common.helpers.GeoPermissionsHelper
 import com.example.snar.common.helpers.isARCoreSessionAvailable
 import com.example.snar.common.helpers.loadBuildingData
 import com.example.snar.databinding.ActivityMainBinding
+import com.google.ar.core.CameraConfig
+import com.google.ar.core.CameraConfigFilter
 import com.google.ar.core.Config
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
@@ -47,32 +44,26 @@ import com.google.ar.core.exceptions.UnavailableDeviceNotCompatibleException
 import com.google.ar.core.exceptions.UnavailableSdkTooOldException
 import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationException
 import com.google.ar.sceneform.ArSceneView
+import com.google.ar.sceneform.FrameTime
+import com.google.ar.sceneform.Scene
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.util.concurrent.Executors
-
+import java.util.EnumSet
 
 class MainActivity : ComponentActivity() {
     companion object {
         private const val TAG = "ARActivity"
     }
-    private lateinit var binding: ActivityMainBinding
     private lateinit var previewView: SurfaceView
     private lateinit var arSceneView: ArSceneView
     private lateinit var overlayFrame: FrameLayout
-    //private lateinit var arCoreSession: Session
-    private lateinit var cameraManager: CameraManager
-    private var cameraDevice: CameraDevice? = null
-    private var captureSession: CameraCaptureSession? = null
-    private lateinit var surfaceTexture: SurfaceTexture
     private lateinit var surface: Surface
 
     private lateinit var surfaceView: SurfaceView
     lateinit var arCoreSessionHelper: ARCoreSessionLifecycleHelper
     var jsonContent: List<Building>? = null
 
-    //lateinit var view: HelloGeoView
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -85,7 +76,7 @@ class MainActivity : ComponentActivity() {
 
         // Ensure Camera and ARCore support
         if (!ensureCameraAndArCoreSupport()) return
-        // startCamera()
+
         // Check and request permissions using GeoPermissionsHelper
         if (!GeoPermissionsHelper.hasGeoPermissions(this)) {
             GeoPermissionsHelper.requestPermissions(this)
@@ -95,13 +86,6 @@ class MainActivity : ComponentActivity() {
         try {
             setContentView(R.layout.activity_main)
             initializeViews()
-            val config = arCoreSessionHelper.session?.config
-            if (config != null) {
-                config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
-                arCoreSessionHelper.session?.configure(config)
-            } else {
-                Log.e("ARCore", "Config is null")
-            }
 
             initializeSurfaceView()
 
@@ -110,14 +94,10 @@ class MainActivity : ComponentActivity() {
             arCoreSessionHelper.beforeSessionResume = { session ->
                 configureSession(session)
                 arSceneView.setupSession(session)
-
             }
-
-            cameraManager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
 
 
             arCoreSessionHelper.isSessionPaused = false
-
             startFrameUpdateLoop()
             jsonContent = loadBuildingData(this) // Load building data
         } catch (e: UnavailableDeviceNotCompatibleException) {
@@ -145,6 +125,7 @@ class MainActivity : ComponentActivity() {
         Log.e(TAG, "ARCore threw an exception", exception)
         Toast.makeText(this, message, Toast.LENGTH_LONG).show()
     }
+
     private fun ensureCameraAndArCoreSupport(): Boolean {
         if (!isCameraSupported(this)) {
             Toast.makeText(this, "Camera permissions not enabled.", Toast.LENGTH_LONG).show()
@@ -159,6 +140,7 @@ class MainActivity : ComponentActivity() {
 
         return true
     }
+
     private fun initializeViews() {
         surfaceView = findViewById(R.id.surface_view)
         previewView = findViewById(R.id.surfaceView)
@@ -167,13 +149,15 @@ class MainActivity : ComponentActivity() {
         surfaceView.holder.setFormat(PixelFormat.TRANSLUCENT) // Makes background transparent
         overlayFrame = findViewById(R.id.overlayFrame)
         overlayFrame.bringToFront()
+       // arSceneView.setupSession(arCoreSessionHelper.session)
 
 
     }
+
     private fun initializeSurfaceView() {
         surfaceView.holder.addCallback(object : SurfaceHolder.Callback {
             override fun surfaceCreated(holder: SurfaceHolder) {
-                Log.d(TAG, "Surface created.")
+                surface = holder.surface
             }
 
             override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
@@ -181,6 +165,7 @@ class MainActivity : ComponentActivity() {
             }
 
             override fun surfaceDestroyed(holder: SurfaceHolder) {
+                surface.release()
                 Log.d(TAG, "Surface destroyed.")
             }
         })
@@ -189,36 +174,30 @@ class MainActivity : ComponentActivity() {
     private fun configureSession(session: Session) {
         session.configure(
             session.config.apply {
-                // Enable Geospatial Mode.
+                updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
                 geospatialMode = Config.GeospatialMode.ENABLED
                 cloudAnchorMode = Config.CloudAnchorMode.ENABLED
             }
         )
-    }
-    /*
-    //@Deprecated("This method has been deprecated in favor of using the Activity Result API\n      which brings increased type safety via an {@link ActivityResultContract} and the prebuilt\n      contracts for common intents available in\n      {@link androidx.activity.result.contract.ActivityResultContracts}, provides hooks for\n      testing, and allow receiving results in separate, testable classes independent from your\n      activity. Use\n      {@link #registerForActivityResult(ActivityResultContract, ActivityResultCallback)} passing\n      in a {@link RequestMultiplePermissions} object for the {@link ActivityResultContract} and\n      handling the result in the {@link ActivityResultCallback#onActivityResult(Object) callback}.")
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<String>,
-        results: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, results)
-        if (!GeoPermissionsHelper.hasGeoPermissions(this)) {
-            // Use toast instead of snackbar here since the activity will exit.
-            Toast.makeText(this, "Camera and location permissions are needed to run this application", Toast.LENGTH_LONG)
-                .show()
-            if (!GeoPermissionsHelper.shouldShowRequestPermissionRationale(this)) {
-                // Permission denied with checking "Do not ask again".
-                GeoPermissionsHelper.launchPermissionSettings(this)
-            }
-            finish()
-        }
-    }*/
+        val cameraConfigFilter = CameraConfigFilter(session)
+        cameraConfigFilter.setTargetFps(EnumSet.of(CameraConfig.TargetFps.TARGET_FPS_30)) // Target 30 FPS
+        cameraConfigFilter.setDepthSensorUsage(EnumSet.of(CameraConfig.DepthSensorUsage.DO_NOT_USE)) // Skip depth for performance
 
-    //override fun onWindowFocusChanged(hasFocus: Boolean) {
-    //   super.onWindowFocusChanged(hasFocus)
-    //FullScreenHelper.setFullScreenOnWindowFocusChanged(this, hasFocus)
-    //}
+        val cameraConfigList = session.getSupportedCameraConfigs(cameraConfigFilter)
+        if (cameraConfigList.isNotEmpty()) {
+            val matchingConfig = cameraConfigList.minByOrNull { config ->
+                val cameraAspectRatio = config.imageSize.width.toFloat() / config.imageSize.height.toFloat()
+                val screenAspectRatio = overlayFrame.width.toFloat() / overlayFrame.height.toFloat()
+                Math.abs(cameraAspectRatio - screenAspectRatio) // Find the closest match
+            }
+
+            if (matchingConfig != null) {
+                session.cameraConfig = matchingConfig
+                Log.d(TAG, "Selected camera resolution: ${matchingConfig.imageSize.width}x${matchingConfig.imageSize.height}")
+            }
+        }
+
+    }
 
     private fun startFrameUpdateLoop() {
         val exceptionHandler = CoroutineExceptionHandler { _, throwable ->
@@ -235,19 +214,6 @@ class MainActivity : ComponentActivity() {
 
     }
 
-    /*
-    private fun startFrameUpdateLoop() {
-        lifecycleScope.launch(CoroutineExceptionHandler { _, throwable ->
-            Log.e(TAG, "Unhandled coroutine exception", throwable)
-        }) {
-            while (isActive) {
-                arCoreSession?.let { processFrame(it) }
-                delay(100)  // Adjust based on desired frame rate
-            }
-        }
-    }
-*/
-    //val buildingTextViews = mutableMapOf<String, TextView>()
     private fun processFrame(session: Session?) {
         try {
             overlayFrame.removeAllViews()
@@ -281,6 +247,9 @@ class MainActivity : ComponentActivity() {
                             result
                         )
                         val distance = result[0]
+                        val imageSize = session.cameraConfig.imageSize
+                        Log.d("CameraInfo", "Resolution: ${imageSize.width}x${imageSize.height}")
+
                         Log.d("DEBUG1", "Camera Coordinates: lat=${cameraGeospatialPose.latitude}, lon=${cameraGeospatialPose.longitude}")
                         Log.d("DEBUG1", "Building Coordinates: lat=$buildingLat, lon=$buildingLon")
                         Log.d("DEBUG1", "Distance: lat=${result[0]}")
@@ -325,7 +294,20 @@ class MainActivity : ComponentActivity() {
                             distance,
                             building.description
                         )
-                        Log.d("TEXTSIZE", "size: ${16f - (distance/50)}, name: ${building.name}")
+                        var adjTextSize: Float
+                        val maxTextSize = 16f // Base text size for the nearest objects
+                        val minTextSize = 8f  // Minimum text size for farthest objects
+                        val maxDistance = 500f
+                        if (distance > maxDistance) {
+                            adjTextSize = minTextSize
+                        }
+                        else if(distance <= 0){
+                            adjTextSize = maxTextSize
+                        }
+                        else{
+                            adjTextSize = maxTextSize - ((maxTextSize - minTextSize) * distance/maxDistance)
+                        }
+                        Log.d("TEXTSIZE", "size: $adjTextSize, name: ${building.name}")
 
                         if (buildingTextViews.containsKey(building.name)) {
                             // Update existing TextView
@@ -361,12 +343,13 @@ class MainActivity : ComponentActivity() {
                                 x = screenX
                                 y = screenY
                                 z = -distance
-                                textSize = (16f - (distance / 6.25)).toFloat()
+                                textSize = adjTextSize
                             }
-                            //if (distance <= 500){
+                            if (distance > maxDistance){
+                                textView.visibility = GONE
+                            }
                                 overlayFrame.addView(textView)
                                 buildingTextViews[building.name] = textView
-                            //}
                         }
 
                         // Mark building as in view
@@ -394,7 +377,6 @@ class MainActivity : ComponentActivity() {
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
-        //if (isGranted) startCamera()
         if (!isGranted) Toast.makeText(this, "Camera permission denied.", Toast.LENGTH_SHORT).show()
     }
 
@@ -407,26 +389,6 @@ class MainActivity : ComponentActivity() {
             }
             .setNegativeButton("No thanks", null)
             .show()
-    }
-
-    private fun stopCamera() {
-        try {
-            val cameraProvider = ProcessCameraProvider.getInstance(this).get()
-            cameraProvider.unbindAll() // Unbind all use cases to release resources
-            Log.d(TAG, "Released all camera resources.")
-        } catch (e: Exception) {
-            Log.e(TAG, "Error releasing camera resources", e)
-        }
-    }
-
-    private fun releaseCameraResources() {
-        try {
-            val cameraProvider = ProcessCameraProvider.getInstance(this).get()
-            cameraProvider.unbindAll() // Unbind all use cases to release resources
-            Log.d(TAG, "Released all camera resources.")
-        } catch (e: Exception) {
-            Log.e(TAG, "Error releasing camera resources", e)
-        }
     }
 
 
@@ -444,81 +406,19 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun openCamera() {
-        try {
-            val cameraId = cameraManager.cameraIdList[0] // Use back camera
-            val cameraCharacteristics = cameraManager.getCameraCharacteristics(cameraId)
-
-            // Create a SurfaceTexture and set it up
-            surfaceTexture = SurfaceTexture(0)
-            surfaceTexture.setDefaultBufferSize(previewView.width, previewView.height)
-            surface = Surface(surfaceTexture)
-
-            // Open the camera
-            cameraManager.openCamera(cameraId, object : CameraDevice.StateCallback() {
-                override fun onOpened(camera: CameraDevice) {
-                    cameraDevice = camera
-                    startPreview()
-                }
-
-                override fun onDisconnected(camera: CameraDevice) {
-                    cameraDevice?.close()
-                    cameraDevice = null
-                }
-
-                override fun onError(camera: CameraDevice, error: Int) {
-                    Log.e(TAG, "Camera error: $error")
-                }
-            }, null)
-        } catch (e: SecurityException) {
-            Log.e(TAG, "Camera permission not granted", e)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to open camera", e)
-        }
+    override fun onResume() {
+        super.onResume()
+        arSceneView.resume()
     }
-
-
-    private fun startPreview() {
-        try {
-            val captureRequestBuilder = cameraDevice?.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
-            captureRequestBuilder?.addTarget(surface)
-
-            // Create a CameraCaptureSession
-            cameraDevice?.createCaptureSession(
-                listOf(surface),
-                object : CameraCaptureSession.StateCallback() {
-                    override fun onConfigured(session: CameraCaptureSession) {
-                        captureSession = session
-                        try {
-                            val captureRequest = captureRequestBuilder?.build()
-                            captureSession?.setRepeatingRequest(captureRequest!!, null, null)
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Failed to start camera preview", e)
-                        }
-                    }
-
-                    override fun onConfigureFailed(session: CameraCaptureSession) {
-                        Log.e(TAG, "Failed to configure camera capture session.")
-                    }
-                },
-                null
-            )
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to start preview", e)
-        }
-    }
-
 
     override fun onPause() {
         super.onPause()
-        cameraDevice?.close()
-        captureSession?.close()
+        arSceneView.pause()
+    }
+    override fun onDestroy() {
+        super.onDestroy()
+        arSceneView.destroy()
+        arCoreSessionHelper.session?.close()
     }
 
-    override fun onResume() {
-        super.onResume()
-        if (previewView.holder.surface.isValid) {
-            openCamera()
-        }
-    }
 }
