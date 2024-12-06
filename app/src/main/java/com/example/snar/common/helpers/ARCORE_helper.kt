@@ -93,6 +93,7 @@ class ARCoreSessionLifecycleHelper(
             isSessionPaused = false
             super.onResume(owner)
         } catch (e: CameraNotAvailableException) {
+            Log.e("ARCoreError", "error resuming")
             exceptionCallback?.invoke(e)
         }
     }
