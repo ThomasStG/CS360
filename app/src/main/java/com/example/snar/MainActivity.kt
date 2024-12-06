@@ -10,12 +10,14 @@ import android.hardware.camera2.CameraCaptureSession
 import android.hardware.camera2.CameraDevice
 import android.hardware.camera2.CameraManager
 import android.location.Location
+import android.opengl.GLES20
 import android.opengl.Matrix
 import android.os.Bundle
 import android.util.Log
 import android.view.Surface
 import android.view.SurfaceHolder
 import android.view.SurfaceView
+import android.view.TextureView
 import android.view.View.GONE
 import android.widget.FrameLayout
 import android.widget.TextView
@@ -59,6 +61,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var arSceneView: ArSceneView
     private lateinit var overlayFrame: FrameLayout
     private lateinit var surface: Surface
+    private var surfaceTexture: SurfaceTexture? = null
+    private var textureId: Int = 0
 
     private lateinit var surfaceView: SurfaceView
     lateinit var arCoreSessionHelper: ARCoreSessionLifecycleHelper
@@ -96,7 +100,21 @@ class MainActivity : ComponentActivity() {
                 arSceneView.setupSession(session)
             }
 
+            val textures = IntArray(1)
+            GLES20.glGenTextures(1, textures, 0)
+            textureId = textures[0]
 
+            // Bind the texture to ARCore
+            arCoreSessionHelper.session?.setCameraTextureName(textureId)
+
+            // Create a SurfaceTexture linked to the OpenGL texture
+            surfaceTexture = SurfaceTexture(textureId).apply {
+                setOnFrameAvailableListener {
+                    // Notify when a new camera frame is available
+                    val textureView = findViewById<TextureView>(R.id.textureView)
+                }
+            }
+            arCoreSessionHelper.session?.setCameraTextureName(textureId)
             arCoreSessionHelper.isSessionPaused = false
             startFrameUpdateLoop()
             jsonContent = loadBuildingData(this) // Load building data
@@ -207,7 +225,7 @@ class MainActivity : ComponentActivity() {
             while (!arCoreSessionHelper.isSessionPaused) {
                 Log.d(TAG, "PROCESSING")
                 processFrame(arCoreSessionHelper.session)
-                delay(100) // Adjust frame rate as necessary
+                delay(32) // Adjust frame rate as necessary
 
             }
         }
@@ -417,8 +435,9 @@ class MainActivity : ComponentActivity() {
     }
     override fun onDestroy() {
         super.onDestroy()
+        surfaceTexture?.release()
+        GLES20.glDeleteTextures(1, intArrayOf(textureId), 0)
         arSceneView.destroy()
         arCoreSessionHelper.session?.close()
     }
-
 }
