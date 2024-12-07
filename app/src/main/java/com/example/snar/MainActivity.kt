@@ -259,6 +259,11 @@ class MainActivity : ComponentActivity() {
                             val normalizedX = (screenPosition[0] / screenPosition[3])//.coerceIn(-1f, 1f)
                             val normalizedY = (screenPosition[1] / screenPosition[3])//.coerceIn(-1f, 1f)
 
+                            if (normalizedX < -1 || normalizedX > 1 || normalizedY < -1 || normalizedY > 1) {
+                                // Building is outside the camera frame skip rendering
+                                return@forEach
+                            }
+
                             val screenX = ((normalizedX + 1) / 2) * overlayFrame.width
                             val screenY = ((1 - normalizedY) / 2) * overlayFrame.height
 
