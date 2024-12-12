@@ -100,7 +100,7 @@ class MainActivity : ComponentActivity() {
             Log.e(TAG, "Camera not available", e)
         } catch (e: Exception) {
             Log.e(TAG, "General exception: ${e.localizedMessage}", e)
-        }
+        } //catching any errors
     }
 
 
@@ -122,12 +122,12 @@ class MainActivity : ComponentActivity() {
             Toast.makeText(this, "Camera permissions not enabled.", Toast.LENGTH_LONG).show()
             finish()
             return false
-        }
+        } //returns false if camera permissions are not enabled
 
         if (!isARCoreSessionAvailable(this)) {
             Toast.makeText(this, "ARCore not supported.", Toast.LENGTH_LONG).show()
             return false
-        }
+        }//returns false if ARCore is not supported
 
         return true
     }
@@ -272,7 +272,7 @@ class MainActivity : ComponentActivity() {
                             val adjTextSize: Float
                             val maxTextSize = 16f // Base text size for the nearest objects
                             val minTextSize = 8f  // Minimum text size for farthest objects
-                            val maxDistance = 500f
+                            val maxDistance = 500f //maximum distance of a building for the text to appear
                             if (distance > maxDistance) {
                                 adjTextSize = minTextSize
                             }
@@ -321,7 +321,7 @@ class MainActivity : ComponentActivity() {
                                 }
                                 if (distance > maxDistance){
                                     textView.visibility = GONE
-                                }
+                                } //if the building is farther away then the max distance
                                 runOnUiThread {
                                     overlayFrame.addView(textView)
                                 }
@@ -374,7 +374,7 @@ class MainActivity : ComponentActivity() {
             }
             .setNegativeButton("No thanks", null)
             .show()
-    }
+    } //the text displayed when giving the option to enable camera permissions
 
     private fun isCameraSupported(context: Context): Boolean {
         return when {
