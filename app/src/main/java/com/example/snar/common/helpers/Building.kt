@@ -13,7 +13,7 @@ data class Building(
     val longitude: Double,
     val altitude: Double,
     val description: String
-)
+) //every building will have these properties
 
 fun loadJsonFromAssets(context: Context, fileName: String): String? {
     return try {
@@ -23,7 +23,7 @@ fun loadJsonFromAssets(context: Context, fileName: String): String? {
         e.printStackTrace()
         null
     }
-}
+} //opening fileName, then reading the text within. 
 
 
 fun loadBuildingData(context: Context): List<Building>? {
@@ -34,6 +34,7 @@ fun loadBuildingData(context: Context): List<Building>? {
     } catch (e: Exception) {
         null
     }
-}
+} //loads the building data using the "building_info.json" file which contains 
+// the descriptions for every building
 
 
